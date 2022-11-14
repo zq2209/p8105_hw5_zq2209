@@ -5,3 +5,108 @@ date: "2022-11-14"
 output: github_document
 ---
 
+```{r}
+library(tidyverse)
+```
+
+
+# Problem 2
+```{r}
+url = "https://raw.githubusercontent.com/washingtonpost/data-homicides/master/homicide-data.csv"
+homicide = read_csv(url) %>% 
+  janitor::clean_names()
+```
+
+```{r}
+summary(homicide)
+```
+
+```{r}
+homicide$city_state = paste(homicide$city, homicide$state, sep = ', ')
+```
+
+
+```{r}
+total_homicides_cities = homicide %>% 
+  group_by(city_state) %>% 
+  summarize(total = n())
+```
+
+```{r}
+total_unsolved_homicides = homicide %>% 
+  filter(disposition == 'Closed without arrest' | disposition == 'Open/No arrest') %>% 
+  group_by(city_state) %>% 
+  summarize(unsolved = n())
+```
+
+```{r}
+total_homicides = left_join(total_homicides_cities, total_unsolved_homicides, by = "city_state")
+total_homicides
+```
+
+```{r}
+total_homicides_baltimore = total_homicides %>% 
+  filter(city_state == "Baltimore, MD")
+prop.test_baltimore = prop.test(total_homicides_baltimore$unsolved, total_homicides_baltimore$total)
+```
+
+
+```{r}
+prop_test = function(df) {
+  ci_unsolved <- prop.test(df$unsolved, df$total)
+  broom::tidy(ci_unsolved) %>% 
+    select(estimate, conf.low, conf.high)
+}
+```
+
+
+```{r}
+prop_test_baltimore = total_homicides %>% 
+  filter(city_state == "Baltimore, MD") %>% 
+  prop_test() %>% 
+  rename("Estimate of proportion" = estimate, 
+         "Lower bound" = conf.low, 
+         "Upper bound" = conf.high) %>% 
+  knitr::kable()
+```
+
+```{r}
+city_nest = nest(total_homicides, unsolved:total)
+city_nest$data[[1]]
+```
+
+```{r}
+
+```
+
+```{r}
+prop_test_all = city_nest[-49,] %>% 
+  mutate(prop_unsolved = map(data, prop_test)) %>% 
+  unnest() %>% 
+  rename('Estimate of proportion' = estimate, 
+         "Lower bound" = conf.low, 
+         "Upper bound" = conf.high) %>% 
+  knitr::kable()
+prop_test_all
+```
+
+```{r}
+prop_ci_all = city_nest[-49,] %>% 
+  mutate(prop_unsolved = map(data, prop_test)) %>% 
+  unnest()
+prop_ci_all %>% 
+  mutate(city_state = fct_reorder(city_state, estimate)) %>% 
+  ggplot(aes(x = city_state, y = estimate)) + 
+  geom_point(color = "red") + 
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high)) + 
+  coord_flip() + 
+  labs(title = "Proportion of unsolved cases in 50 major US cities", 
+       y = "Proportion of unsolved cases", 
+       x = "City", 
+       caption = "Bars represent 95% confidence interval") + 
+  theme_classic() 
+```
+
+
+
+
