@@ -17,84 +17,136 @@ homicide = read_csv(url) %>%
   janitor::clean_names()
 ```
 
+## Desctibe raw data
 ```{r}
 summary(homicide)
+dim(homicide)
 ```
 
+There are 52179 rows and 12 columns in the dataset. The columns are uni, reported_date(the day of victim reported), victim_last(last name of victim), victim_first(first name), victim race, victim age, victim sex, city, state, latitude, longitude, and disposition. 
+
+## Create a `city_state` variable
 ```{r}
 homicide$city_state = paste(homicide$city, homicide$state, sep = ', ')
+homicide %>%
+  head() %>% 
+  knitr::kable()
 ```
 
 
+## Total number of homicides within cities
 ```{r}
 total_homicides_cities = homicide %>% 
   group_by(city_state) %>% 
-  summarize(total = n())
+  summarize(total = n()) %>% 
+  arrange(desc(total)) %>% 
+  knitr::kable()
+total_homicides_cities
 ```
 
+## Total number of unsolved homicides withinn cities
 ```{r}
 total_unsolved_homicides = homicide %>% 
   filter(disposition == 'Closed without arrest' | disposition == 'Open/No arrest') %>% 
   group_by(city_state) %>% 
-  summarize(unsolved = n())
+  summarize(unsolved = n()) %>% 
+  arrange(desc(unsolved)) %>% 
+  knitr::kable()
+total_unsolved_homicides
 ```
 
+## Total number of all and unsolved homicides withinn cities
 ```{r}
-total_homicides = left_join(total_homicides_cities, total_unsolved_homicides, by = "city_state")
-total_homicides
+total_homicides_table = homicide %>% 
+  group_by(city_state) %>% 
+  summarize(
+    total = n(),
+    unsolved = sum(disposition == "Open/No arrest") + sum(disposition == "Closed without arrest")) %>% 
+  arrange(desc(total)) %>% 
+  knitr::kable()
+total_homicides_table
+```
+
+## `prop.test` for Baltimore, MD
+```{r}
+total_homicides = homicide %>% 
+  group_by(city_state) %>% 
+  summarize(
+    total = n(),
+    unsolved = sum(disposition == "Open/No arrest") + sum(disposition == "Closed without arrest")) %>% 
+  arrange(desc(total))
 ```
 
 ```{r}
 total_homicides_baltimore = total_homicides %>% 
   filter(city_state == "Baltimore, MD")
 prop.test_baltimore = prop.test(total_homicides_baltimore$unsolved, total_homicides_baltimore$total)
+prop.test_baltimore
 ```
-
-
+### Save result as .RData
 ```{r}
-prop_test = function(df) {
-  ci_unsolved <- prop.test(df$unsolved, df$total)
-  broom::tidy(ci_unsolved) %>% 
-    select(estimate, conf.low, conf.high)
-}
+save(prop.test_baltimore, file = "result/prop_test_baltimore_result.RData")
 ```
-
-
+### Table of `prop.test` result
 ```{r}
-prop_test_baltimore = total_homicides %>% 
-  filter(city_state == "Baltimore, MD") %>% 
-  prop_test() %>% 
+prop_test_baltimore = prop.test_baltimore %>% 
+  broom::tidy() %>% 
+  select(estimate,conf.low,conf.high) %>% 
   rename("Estimate of proportion" = estimate, 
          "Lower bound" = conf.low, 
          "Upper bound" = conf.high) %>% 
   knitr::kable()
+prop_test_baltimore
+```
+
+
+## Writing a function
+```{r}
+prop_unsolved_all = function(citystate){
+  city_df = homicide %>% 
+    filter(city_state == citystate) %>% 
+    nrow()
+  
+  unsolved = homicide %>% 
+    filter(city_state == citystate) %>%
+    filter(disposition == 'Closed without arrest' | disposition == 'Open/No arrest') %>% 
+    nrow()
+  
+    result = prop.test(unsolved, city_df) %>% 
+    broom::tidy() %>% 
+    select(estimate, conf.low, conf.high)
+    
+    result
+}
+```
+
+## Loop the function over all 50 cities
+```{r}
+city_state_list = homicide %>% 
+  select(city_state) %>% 
+  unique()
 ```
 
 ```{r}
-city_nest = nest(total_homicides, unsolved:total)
-city_nest$data[[1]]
+prop_test_all = city_state_list %>% 
+  mutate(prop_result = map(city_state, prop_unsolved)) %>% 
+  unnest(prop_result) %>% 
+  arrange(desc(estimate))
 ```
 
+### Table of `prop.test` result
 ```{r}
-
-```
-
-```{r}
-prop_test_all = city_nest[-49,] %>% 
-  mutate(prop_unsolved = map(data, prop_test)) %>% 
-  unnest() %>% 
+prop_test_all_table = prop_test_all %>% 
   rename('Estimate of proportion' = estimate, 
          "Lower bound" = conf.low, 
          "Upper bound" = conf.high) %>% 
   knitr::kable()
-prop_test_all
+prop_test_all_table
 ```
 
+### Plot of `prop.test` result
 ```{r}
-prop_ci_all = city_nest[-49,] %>% 
-  mutate(prop_unsolved = map(data, prop_test)) %>% 
-  unnest()
-prop_ci_all %>% 
+prop_test_all %>% 
   mutate(city_state = fct_reorder(city_state, estimate)) %>% 
   ggplot(aes(x = city_state, y = estimate)) + 
   geom_point(color = "red") + 
@@ -102,23 +154,24 @@ prop_ci_all %>%
   coord_flip() + 
   labs(title = "Proportion of unsolved cases in 50 major US cities", 
        y = "Proportion of unsolved cases", 
-       x = "City", 
+       x = "City, State", 
        caption = "Bars represent 95% confidence interval") + 
   theme_classic() 
 ```
 
 
 # Problem 3
-
+## Generate 5000 datasets for mu = 0
 ```{r}
 datasets = map(1:5000, ~ rnorm(n = 30, mean = 0, sd = 5))
 ```
 
+## Writing a function
 ```{r}
-t_test = function(mu = 0) {
-  sample = tibble(rnorm(n = 30, mean = mu, sd = 5))
+t_test = function(mu) {
+  data = c(rnorm(n = 30, mean = mu, sd = 5))
   
-  result = t.test(sample) %>% 
+  result = t.test(data, mu = mu) %>% 
     broom::tidy() %>% 
     select(estimate,p.value)
   
@@ -126,54 +179,84 @@ t_test = function(mu = 0) {
 }
 ```
 
+## Loop over 5000 datasets for mu = 0
 ```{r}
-t_test(mu = 0) %>% 
-  knitr::kable()
-```
-
-```{r}
-t_test_mu0 = expand_grid(mean = 0, iteration = 1:5000) %>%
+iteration = 1:5000
+mu0_df = tibble(iteration)
+mu0_df$mean = 0
+t_test_mu0 = mu0_df %>%
   mutate(result = map(mean,t_test)) %>% 
   unnest(result)
 head(t_test_mu0)
 ```
 
+## Loop over 5000 datasets for mu = 1-6
 ```{r}
-t_test_all <- expand_grid(mean = 1:6, iteration = 1:5000) %>% 
+mu_df = expand_grid(mean = 1:6, iteration = 1:5000)
+t_test_all <- mu_df %>% 
   mutate(result = map(mean,t_test)) %>% 
   unnest(result)
 
 head(t_test_all)
 ```
 
+## Plot showing the power of the test on the y axis and the true value of mean on the x axis
 ```{r}
-t_test_all %>%
+power_test = t_test_all %>%
+  filter(p.value < 0.05) %>% 
   group_by(mean) %>% 
-  summarize(reject_prop = sum(p.value < 0.05)/5000) %>% 
+  count() %>% 
+  mutate(reject_prop = n/5000) %>% 
   ggplot(aes(x = mean,y = reject_prop)) +
   scale_x_continuous(limits = c(1,6), breaks = seq(1,6,1)) + 
   geom_point() + geom_path() +
   labs(x = "True Mean",y = "Power of Test",title = "Power of t.test on different means")
+power_test
 ```
 
 ```{r}
-t_test_all %>%
+power_test_table = t_test_all %>%
+  filter(p.value < 0.05) %>% 
+  group_by(mean) %>% 
+  count() %>% 
+  mutate(reject_prop = n/5000) %>% 
+  knitr::kable()
+power_test_table
+```
+
+As seen in plots and summary table, the number of rejected samples don't have much difference by different true mean. And the proportion of rejected samples in the plot doesn't show a obvious association between true mean and power of test.
+
+## Plot showing the average estimate of mean on the y axis and the true value of mean on the x axis.
+```{r}
+average_mean_all = t_test_all %>%
   group_by(mean) %>% 
   summarize(average_estimates = mean(estimate,na.rm = T)) %>% 
   ggplot(aes(x = mean,y = average_estimates)) +
   scale_x_continuous(limits = c(1,6), breaks = seq(1,6,1)) + 
   geom_point() + geom_path() +
   labs(x = "True Mean",y = "Average of Estimated Means for all Samples",title = "Estimated Means")
+average_mean_all
 ```
 
 ```{r}
-t_test_reject <- t_test_all %>% 
+average_mean_all_table = t_test_all %>%
+  group_by(mean) %>% 
+  summarize(average_estimates = mean(estimate,na.rm = T)) %>% 
+  knitr::kable()
+average_mean_all_table
+```
+
+As shown in plot and table, the average of estimated means is almost equal to the true mean. The line is straight.
+
+## Plot showing average estimate of mean only in samples for rejected samples on the y axis and the true value of mean on the x axis
+```{r}
+t_test_reject = t_test_all %>% 
   filter(p.value < 0.05) %>% 
   group_by(mean) %>% 
   summarize(average_estimates = mean(estimate,na.rm = T)) %>% 
   ungroup()
 
-t_test_all = t_test_all %>% 
+t_test_all_samples = t_test_all %>% 
   group_by(mean) %>% 
   summarize(average_estimates = mean(estimate,na.rm = T)) %>% 
   ungroup()
@@ -188,23 +271,28 @@ t_test_reject %>%
 ```
 
 ```{r}
+t_test_reject_table = t_test_all %>% 
+  filter(p.value < 0.05) %>% 
+  group_by(mean) %>% 
+  summarize(average_estimates = mean(estimate,na.rm = T)) %>%
+  knitr::kable()
+t_test_reject_table
+```
+
+As shown in table and plot, the average of estimates of rejected samples is not exactly equal to true mean, which is make sense that difference in average of estimates and true mean should be statistically large to reject the null hypothesis. 
+
+## Rejected samples vs. All samples
+```{r}
 ggplot(t_test_all, aes(x = mean, y = average_estimates)) +
-  geom_line(data = t_test_all, aes(color = "black")) +
+  geom_line(data = t_test_all_samples, aes(color = "black")) +
   geom_line(data = t_test_reject, aes(color = "red")) +
   scale_color_manual(name = " ", values = c("black" = "black", "red" = "red"),
                      labels = c('Estimates of All Samples','Estimates of Rejected Samples')) +
-  geom_point(data = t_test_all,color = "black") +
+  geom_point(data = t_test_all_samples,color = "black") +
   geom_point(data = t_test_reject,color = "red") +
   scale_x_continuous(limits = c(1,6), breaks = seq(1,6,1)) +
   labs(x = "True Mean",y = "Average of Estimate Means",title = "Estimates of All Samples vs. Rejected Samples")
 ```
-
-
-
-
-
-
-
 
 
 
