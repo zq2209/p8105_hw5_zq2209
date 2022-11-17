@@ -171,7 +171,7 @@ datasets = map(1:5000, ~ rnorm(n = 30, mean = 0, sd = 5))
 t_test = function(mu) {
   data = c(rnorm(n = 30, mean = mu, sd = 5))
   
-  result = t.test(data, mu = mu) %>% 
+  result = t.test(data) %>% 
     broom::tidy() %>% 
     select(estimate,p.value)
   
@@ -224,7 +224,7 @@ power_test_table = t_test_all %>%
 power_test_table
 ```
 
-As seen in plots and summary table, the number of rejected samples don't have much difference by different true mean. And the proportion of rejected samples in the plot doesn't show a obvious association between true mean and power of test. And all proportions for different means are actually surrounding 0.05(0.045-0.055), which is the alpha that we set to reject null hypothesis. This result does make sense because when datasets are large enough, the power of test is approximately to 0.05.
+As seen in plots and summary table, the proportion of rejected samples increased as mean deviated from 0 gradually. It is reasonable to conclude that as sample size and alpha stay unchanged, the much larger difference in average of estimates and true mean, the larger the power of test(proportion of rejected samples). 
 
 ## Plot showing the average estimate of mean on the y axis and the true value of mean on the x axis.
 ```{r}
@@ -246,7 +246,7 @@ average_mean_all_table = t_test_all %>%
 average_mean_all_table
 ```
 
-As shown in plot and table, the average of estimated means is almost equal to the true mean. The line is straight.
+As shown in plot and table, the average of estimated means is equal to the true mean. The line is straight.
 
 ## Plot showing average estimate of mean only in samples for rejected samples on the y axis and the true value of mean on the x axis
 ```{r}
@@ -279,7 +279,7 @@ t_test_reject_table = t_test_all %>%
 t_test_reject_table
 ```
 
-As shown in table and plot, the average of estimates of rejected samples is not exactly equal to true mean, which is make sense that difference in average of estimates and true mean should be statistically large to reject the null hypothesis. The line is not straight. But there are not very far away from true mean. There is no obvious large deviation from straight line.
+As shown in table and plot, the average of estimates of rejected samples is not exactly equal to true mean, which is make sense that difference in average of estimates and true mean should be statistically large to reject the null hypothesis. For true mean < 4, estimates need to be far from true mean to reject the hypothesis that mean is 0, because true mean of these samples is not far from 0. If not, the difference won't be statistically large to reject the null. So, the average of estimates will deviate from true mean, same as shown in plot. For true mean >= 4, the difference in estimate and true mean don't need to be large, because true mean is already far from 0. So, the average of estimates tends to equal true mean.
 
 ## Rejected samples vs. All samples
 ```{r}
