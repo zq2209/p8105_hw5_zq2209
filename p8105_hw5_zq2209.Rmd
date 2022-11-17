@@ -129,7 +129,7 @@ city_state_list = homicide %>%
 
 ```{r}
 prop_test_all = city_state_list %>% 
-  mutate(prop_result = map(city_state, prop_unsolved)) %>% 
+  mutate(prop_result = map(city_state, prop_unsolved_all)) %>% 
   unnest(prop_result) %>% 
   arrange(desc(estimate))
 ```
@@ -224,7 +224,7 @@ power_test_table = t_test_all %>%
 power_test_table
 ```
 
-As seen in plots and summary table, the number of rejected samples don't have much difference by different true mean. And the proportion of rejected samples in the plot doesn't show a obvious association between true mean and power of test.
+As seen in plots and summary table, the number of rejected samples don't have much difference by different true mean. And the proportion of rejected samples in the plot doesn't show a obvious association between true mean and power of test. And all proportions for different means are actually surrounding 0.05(0.045-0.055), which is the alpha that we set to reject null hypothesis. This result does make sense because when datasets are large enough, the power of test is approximately to 0.05.
 
 ## Plot showing the average estimate of mean on the y axis and the true value of mean on the x axis.
 ```{r}
@@ -293,7 +293,5 @@ ggplot(t_test_all, aes(x = mean, y = average_estimates)) +
   scale_x_continuous(limits = c(1,6), breaks = seq(1,6,1)) +
   labs(x = "True Mean",y = "Average of Estimate Means",title = "Estimates of All Samples vs. Rejected Samples")
 ```
-
-
 
 
