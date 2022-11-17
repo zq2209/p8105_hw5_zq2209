@@ -279,7 +279,7 @@ t_test_reject_table = t_test_all %>%
 t_test_reject_table
 ```
 
-As shown in table and plot, the average of estimates of rejected samples is not exactly equal to true mean, which is make sense that difference in average of estimates and true mean should be statistically large to reject the null hypothesis. 
+As shown in table and plot, the average of estimates of rejected samples is not exactly equal to true mean, which is make sense that difference in average of estimates and true mean should be statistically large to reject the null hypothesis. The line is not straight. But there are not very far away from true mean. There is no obvious large deviation from straight line.
 
 ## Rejected samples vs. All samples
 ```{r}
